@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .tab-active {
+      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+      color: white;
+    }
+    .card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-preparing { background: #dbeafe; color: #1e40af; }
+    .status-ready { background: #d1fae5; color: #065f46; }
+    .status-completed { background: #e5e7eb; color: #374151; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide { animation: slideIn 0.3s ease-out; }
+  </style>
+</head>
+<body class="h-full bg-slate-50">
+  <div id="app" class="h-full w-full flex flex-col overflow-auto">
+    
+    <!-- Header -->
+    <header id="main-header" class="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-6 py-4 shadow-lg">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+            <span class="text-2xl">🍽️</span>
+          </div>
+          <div>
+            <h1 id="restaurant-title" class="text-xl font-bold">My Restaurant</h1>
+            <p class="text-orange-100 text-sm">Business Management System</p>
+          </div>
+        </div>
+        <div id="today-stats" class="text-right">
+          <p class="text-orange-100 text-sm">Today's Revenue</p>
+          <p id="daily-revenue" class="text-2xl font-bold">$0.00</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white px-4 py-3 shadow-sm border-b border-slate-200">
+      <div class="flex gap-2 overflow-x-auto">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-active px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all">
+          📊 Dashboard
+        </button>
+        <button onclick="switchTab('orders')" id="tab-orders" class="px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap text-slate-600 hover:bg-slate-100 transition-all">
+          🧾 Orders
+        </button>
+        <button onclick="switchTab('menu')" id="tab-menu" class="px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap text-slate-600 hover:bg-slate-100 transition-all">
+          📋 Menu
+        </button>
+        <button onclick="switchTab('new-order')" id="tab-new-order" class="px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap text-slate-600 hover:bg-slate-100 transition-all">
+          ➕ New Order
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 overflow-auto">
+      
+      <!-- Dashboard View -->
+      <div id="view-dashboard" class="space-y-4 animate-slide">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <p class="text-slate-500 text-xs uppercase tracking-wide">Active Orders</p>
+            <p id="stat-active" class="text-2xl font-bold text-slate-800 mt-1">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <p class="text-slate-500 text-xs uppercase tracking-wide">Completed</p>
+            <p id="stat-completed" class="text-2xl font-bold text-emerald-600 mt-1">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <p class="text-slate-500 text-xs uppercase tracking-wide">Menu Items</p>
+            <p id="stat-menu" class="text-2xl font-bold text-blue-600 mt-1">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <p class="text-slate-500 text-xs uppercase tracking-wide">Avg Order</p>
+            <p id="stat-avg" class="text-2xl font-bold text-amber-600 mt-1">$0</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <h3 class="font-semibold text-slate-800 mb-3">📍 Recent Activity</h3>
+          <div id="recent-activity" class="space-y-2">
+            <p class="text-slate-400 text-sm text-center py-4">No recent activity</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orders View -->
+      <div id="view-orders" class="hidden space-y-3 animate-slide">
+        <div class="flex gap-2 overflow-x-auto pb-2">
+          <button onclick="filterOrders('all')" class="order-filter-btn filter-active px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-white" data-filter="all">All</button>
+          <button onclick="filterOrders('pending')" class="order-filter-btn px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="pending">Pending</button>
+          <button onclick="filterOrders('preparing')" class="order-filter-btn px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="preparing">Preparing</button>
+          <button onclick="filterOrders('ready')" class="order-filter-btn px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="ready">Ready</button>
+          <button onclick="filterOrders('completed')" class="order-filter-btn px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600" data-filter="completed">Completed</button>
+        </div>
+        <div id="orders-list" class="space-y-3">
+          <p class="text-slate-400 text-sm text-center py-8">No orders yet. Create your first order!</p>
+        </div>
+      </div>
+
+      <!-- Menu View -->
+      <div id="view-menu" class="hidden space-y-4 animate-slide">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <h3 class="font-semibold text-slate-800 mb-3">➕ Add Menu Item</h3>
+          <form id="menu-form" class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="item-name" class="text-xs text-slate-500 font-medium">Item Name</label>
+                <input type="text" id="item-name" placeholder="e.g., Margherita Pizza" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent" required>
+              </div>
+              <div>
+                <label for="item-price" class="text-xs text-slate-500 font-medium">Price</label>
+                <input type="number" id="item-price" step="0.01" min="0" placeholder="0.00" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent" required>
+              </div>
+            </div>
+            <div>
+              <label for="item-category" class="text-xs text-slate-500 font-medium">Category</label>
+              <select id="item-category" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                <option value="appetizer">🥗 Appetizer</option>
+                <option value="main">🍝 Main Course</option>
+                <option value="dessert">🍰 Dessert</option>
+                <option value="beverage">🥤 Beverage</option>
+              </select>
+            </div>
+            <button type="submit" id="add-menu-btn" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white py-2.5 rounded-lg font-medium text-sm hover:shadow-lg transition-all">
+              Add to Menu
+            </button>
+          </form>
+        </div>
+        <div id="menu-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <p class="text-slate-400 text-sm text-center py-8 col-span-full">No menu items. Add your first item above!</p>
+        </div>
+      </div>
+
+      <!-- New Order View -->
+      <div id="view-new-order" class="hidden space-y-4 animate-slide">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <h3 class="font-semibold text-slate-800 mb-3">🪑 Table Number</h3>
+          <div class="flex gap-2 flex-wrap">
+            <button onclick="selectTable(1)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">1</button>
+            <button onclick="selectTable(2)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">2</button>
+            <button onclick="selectTable(3)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">3</button>
+            <button onclick="selectTable(4)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">4</button>
+            <button onclick="selectTable(5)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">5</button>
+            <button onclick="selectTable(6)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">6</button>
+            <button onclick="selectTable(7)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">7</button>
+            <button onclick="selectTable(8)" class="table-btn w-10 h-10 rounded-lg border-2 border-slate-200 font-medium text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-all">8</button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <h3 class="font-semibold text-slate-800 mb-3">📋 Select Items</h3>
+          <div id="order-menu-items" class="space-y-2 max-h-48 overflow-y-auto">
+            <p class="text-slate-400 text-sm text-center py-4">Add menu items first</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <h3 class="font-semibold text-slate-800 mb-3">🛒 Order Summary</h3>
+          <div id="order-summary" class="space-y-2 mb-3">
+            <p class="text-slate-400 text-sm text-center py-2">No items selected</p>
+          </div>
+          <div class="border-t border-slate-100 pt-3 flex justify-between items-center">
+            <span class="font-semibold text-slate-800">Total:</span>
+            <span id="order-total" class="text-xl font-bold text-orange-600">$0.00</span>
+          </div>
+          <button onclick="submitOrder()" id="submit-order-btn" class="w-full mt-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-2.5 rounded-lg font-medium text-sm hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            Submit Order
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium opacity-0 transition-opacity pointer-events-none"></div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+        <h3 class="font-semibold text-slate-800 mb-2">Delete Item?</h3>
+        <p class="text-slate-500 text-sm mb-4">This action cannot be undone.</p>
+        <div class="flex gap-3">
+          <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 font-medium text-sm hover:bg-slate-50">Cancel</button>
+          <button onclick="confirmDelete()" id="confirm-delete-btn" class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600">Delete</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // State management
+    let allData = [];
+    let currentTab = 'dashboard';
+    let currentOrderFilter = 'all';
+    let selectedTable = null;
+    let orderItems = [];
+    let deleteTarget = null;
+    let isLoading = false;
+
+    const defaultConfig = {
+      restaurant_name: 'My Restaurant',
+      currency_symbol: '$',
+      background_color: '#f8fafc',
+      surface_color: '#ffffff',
+      text_color: '#1e293b',
+      primary_color: '#f97316',
+      secondary_color: '#64748b'
+    };
+
+    let config = { ...defaultConfig };
+
+    // Element SDK initialization
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (newConfig) => {
+          config = { ...defaultConfig, ...newConfig };
+          applyConfig();
+        },
+        mapToCapabilities: (cfg) => ({
+          recolorables: [
+            {
+              get: () => cfg.background_color || defaultConfig.background_color,
+              set: (v) => { cfg.background_color = v; window.elementSdk.setConfig({ background_color: v }); }
+            },
+            {
+              get: () => cfg.surface_color || defaultConfig.surface_color,
+              set: (v) => { cfg.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); }
+            },
+            {
+              get: () => cfg.text_color || defaultConfig.text_color,
+              set: (v) => { cfg.text_color = v; window.elementSdk.setConfig({ text_color: v }); }
+            },
+            {
+              get: () => cfg.primary_color || defaultConfig.primary_color,
+              set: (v) => { cfg.primary_color = v; window.elementSdk.setConfig({ primary_color: v }); }
+            },
+            {
+              get: () => cfg.secondary_color || defaultConfig.secondary_color,
+              set: (v) => { cfg.secondary_color = v; window.elementSdk.setConfig({ secondary_color: v }); }
+            }
+          ],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (cfg) => new Map([
+          ['restaurant_name', cfg.restaurant_name || defaultConfig.restaurant_name],
+          ['currency_symbol', cfg.currency_symbol || defaultConfig.currency_symbol]
+        ])
+      });
+    }
+
+    function applyConfig() {
+      const bg = config.background_color || defaultConfig.background_color;
+      const surface = config.surface_color || defaultConfig.surface_color;
+      const text = config.text_color || defaultConfig.text_color;
+      const primary = config.primary_color || defaultConfig.primary_color;
+      const secondary = config.secondary_color || defaultConfig.secondary_color;
+      const name = config.restaurant_name || defaultConfig.restaurant_name;
+      const currency = config.currency_symbol || defaultConfig.currency_symbol;
+
+      document.body.style.backgroundColor = bg;
+      document.getElementById('restaurant-title').textContent = name;
+
+      // Update all surface elements
+      document.querySelectorAll('.bg-white').forEach(el => {
+        el.style.backgroundColor = surface;
+      });
+
+      // Update text colors
+      document.querySelectorAll('.text-slate-800, .font-bold').forEach(el => {
+        if (!el.classList.contains('text-emerald-600') && !el.classList.contains('text-blue-600') && !el.classList.contains('text-amber-600')) {
+          el.style.color = text;
+        }
+      });
+
+      // Update primary gradient elements
+      const header = document.getElementById('main-header');
+      header.style.background = `linear-gradient(135deg, ${primary} 0%, ${adjustColor(primary, -20)} 100%)`;
+
+      // Update all currency displays
+      updateCurrencyDisplays();
+      renderAll();
+    }
+
+    function adjustColor(color, amount) {
+      const hex = color.replace('#', '');
+      const r = Math.max(0, Math.min(255, parseInt(hex.slice(0, 2), 16) + amount));
+      const g = Math.max(0, Math.min(255, parseInt(hex.slice(2, 4), 16) + amount));
+      const b = Math.max(0, Math.min(255, parseInt(hex.slice(4, 6), 16) + amount));
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+
+    function getCurrency() {
+      return config.currency_symbol || defaultConfig.currency_symbol;
+    }
+
+    function updateCurrencyDisplays() {
+      const orders = allData.filter(d => d.type === 'order');
+      const completedOrders = orders.filter(o => o.status === 'completed');
+      const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+      document.getElementById('daily-revenue').textContent = `${getCurrency()}${totalRevenue.toFixed(2)}`;
+    }
+
+    // Data SDK initialization
+    const dataHandler = {
+      onDataChanged(data) {
+        allData = data;
+        renderAll();
+      }
+    };
+
+    async function initDataSdk() {
+      if (window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) {
+          console.error('Failed to initialize data SDK');
+        }
+      }
+    }
+
+    // Tab navigation
+    function switchTab(tab) {
+      currentTab = tab;
+      ['dashboard', 'orders', 'menu', 'new-order'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const tabBtn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          view.classList.remove('hidden');
+          tabBtn.classList.add('tab-active');
+          tabBtn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+        } else {
+          view.classList.add('hidden');
+          tabBtn.classList.remove('tab-active');
+          tabBtn.classList.add('text-slate-600', 'hover:bg-slate-100');
+        }
+      });
+      if (tab === 'new-order') {
+        renderOrderMenuItems();
+      }
+    }
+
+    // Render functions
+    function renderAll() {
+      renderDashboard();
+      renderOrders();
+      renderMenu();
+      renderOrderMenuItems();
+      updateCurrencyDisplays();
+    }
+
+    function renderDashboard() {
+      const orders = allData.filter(d => d.type === 'order');
+      const menuItems = allData.filter(d => d.type === 'menu_item');
+      const activeOrders = orders.filter(o => o.status !== 'completed');
+      const completedOrders = orders.filter(o => o.status === 'completed');
+      const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const avgOrder = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
+
+      document.getElementById('stat-active').textContent = activeOrders.length;
+      document.getElementById('stat-completed').textContent = completedOrders.length;
+      document.getElementById('stat-menu').textContent = menuItems.length;
+      document.getElementById('stat-avg').textContent = `${getCurrency()}${avgOrder.toFixed(0)}`;
+      document.getElementById('daily-revenue').textContent = `${getCurrency()}${totalRevenue.toFixed(2)}`;
+
+      const recentActivity = document.getElementById('recent-activity');
+      const recentOrders = orders.slice(-5).reverse();
+      if (recentOrders.length === 0) {
+        recentActivity.innerHTML = '<p class="text-slate-400 text-sm text-center py-4">No recent activity</p>';
+      } else {
+        recentActivity.innerHTML = recentOrders.map(order => `
+          <div class="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">🪑</span>
+              <span class="text-sm font-medium text-slate-700">Table ${order.table_number}</span>
+              <span class="status-${order.status} px-2 py-0.5 rounded-full text-xs font-medium capitalize">${order.status}</span>
+            </div>
+            <span class="text-sm font-semibold text-slate-800">${getCurrency()}${(order.total || 0).toFixed(2)}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderOrders() {
+      const orders = allData.filter(d => d.type === 'order');
+      let filteredOrders = orders;
+      if (currentOrderFilter !== 'all') {
+        filteredOrders = orders.filter(o => o.status === currentOrderFilter);
+      }
+
+      const ordersList = document.getElementById('orders-list');
+      if (filteredOrders.length === 0) {
+        ordersList.innerHTML = '<p class="text-slate-400 text-sm text-center py-8">No orders found</p>';
+        return;
+      }
+
+      ordersList.innerHTML = filteredOrders.map(order => `
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 card-hover transition-all" data-order-id="${order.__backendId}">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🪑</span>
+              <span class="font-semibold text-slate-800">Table ${order.table_number}</span>
+            </div>
+            <span class="status-${order.status} px-3 py-1 rounded-full text-xs font-medium capitalize">${order.status}</span>
+          </div>
+          <div class="text-sm text-slate-500 mb-3">${order.items || 'No items'}</div>
+          <div class="flex items-center justify-between">
+            <span class="text-lg font-bold text-orange-600">${getCurrency()}${(order.total || 0).toFixed(2)}</span>
+            <div class="flex gap-2">
+              ${order.status !== 'completed' ? `
+                <button onclick="updateOrderStatus('${order.__backendId}')" class="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-200 transition-all">
+                  ${getNextStatusLabel(order.status)}
+                </button>
+              ` : ''}
+              <button onclick="openDeleteModal('order', '${order.__backendId}')" class="px-3 py-1.5 bg-red-100 text-red-600 rounded-lg text-xs font-medium hover:bg-red-200 transition-all">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function getNextStatusLabel(status) {
+      const labels = { pending: '→ Preparing', preparing: '→ Ready', ready: '→ Complete' };
+      return labels[status] || '✓ Done';
+    }
+
+    function getNextStatus(status) {
+      const next = { pending: 'preparing', preparing: 'ready', ready: 'completed' };
+      return next[status] || 'completed';
+    }
+
+    async function updateOrderStatus(orderId) {
+      if (isLoading) return;
+      const order = allData.find(d => d.__backendId === orderId);
+      if (!order) return;
+
+      isLoading = true;
+      const newStatus = getNextStatus(order.status);
+      const result = await window.dataSdk.update({ ...order, status: newStatus });
+      isLoading = false;
+
+      if (result.isOk) {
+        showToast(`Order moved to ${newStatus}`);
+      } else {
+        showToast('Failed to update order');
+      }
+    }
+
+    function filterOrders(filter) {
+      currentOrderFilter = filter;
+      document.querySelectorAll('.order-filter-btn').forEach(btn => {
+        if (btn.dataset.filter === filter) {
+          btn.classList.add('bg-slate-800', 'text-white');
+          btn.classList.remove('bg-slate-100', 'text-slate-600');
+        } else {
+          btn.classList.remove('bg-slate-800', 'text-white');
+          btn.classList.add('bg-slate-100', 'text-slate-600');
+        }
+      });
+      renderOrders();
+    }
+
+    function renderMenu() {
+      const menuItems = allData.filter(d => d.type === 'menu_item');
+      const menuList = document.getElementById('menu-list');
+
+      if (menuItems.length === 0) {
+        menuList.innerHTML = '<p class="text-slate-400 text-sm text-center py-8 col-span-full">No menu items. Add your first item above!</p>';
+        return;
+      }
+
+      const categoryIcons = { appetizer: '🥗', main: '🍝', dessert: '🍰', beverage: '🥤' };
+      menuList.innerHTML = menuItems.map(item => `
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 card-hover transition-all">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">${categoryIcons[item.category] || '🍽️'}</span>
+              <div>
+                <h4 class="font-semibold text-slate-800">${item.name}</h4>
+                <p class="text-xs text-slate-400 capitalize">${item.category}</p>
+              </div>
+            </div>
+            <span class="text-lg font-bold text-orange-600">${getCurrency()}${(item.price || 0).toFixed(2)}</span>
+          </div>
+          <button onclick="openDeleteModal('menu_item', '${item.__backendId}')" class="mt-3 w-full px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-medium hover:bg-red-100 transition-all">
+            Remove
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function renderOrderMenuItems() {
+      const menuItems = allData.filter(d => d.type === 'menu_item');
+      const container = document.getElementById('order-menu-items');
+
+      if (menuItems.length === 0) {
+        container.innerHTML = '<p class="text-slate-400 text-sm text-center py-4">Add menu items first</p>';
+        return;
+      }
+
+      container.innerHTML = menuItems.map(item => {
+        const inOrder = orderItems.find(oi => oi.id === item.__backendId);
+        const qty = inOrder ? inOrder.qty : 0;
+        return `
+          <div class="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+            <div>
+              <span class="font-medium text-slate-700">${item.name}</span>
+              <span class="text-sm text-slate-400 ml-2">${getCurrency()}${(item.price || 0).toFixed(2)}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="updateOrderItem('${item.__backendId}', -1)" class="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all">-</button>
+              <span class="w-6 text-center font-medium">${qty}</span>
+              <button onclick="updateOrderItem('${item.__backendId}', 1)" class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 font-bold hover:bg-orange-200 transition-all">+</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      renderOrderSummary();
+    }
+
+    function updateOrderItem(itemId, delta) {
+      const menuItem = allData.find(d => d.__backendId === itemId);
+      if (!menuItem) return;
+
+      const existing = orderItems.find(oi => oi.id === itemId);
+      if (existing) {
+        existing.qty = Math.max(0, existing.qty + delta);
+        if (existing.qty === 0) {
+          orderItems = orderItems.filter(oi => oi.id !== itemId);
+        }
+      } else if (delta > 0) {
+        orderItems.push({ id: itemId, name: menuItem.name, price: menuItem.price, qty: 1 });
+      }
+
+      renderOrderMenuItems();
+    }
+
+    function renderOrderSummary() {
+      const summary = document.getElementById('order-summary');
+      const totalEl = document.getElementById('order-total');
+      const submitBtn = document.getElementById('submit-order-btn');
+
+      if (orderItems.length === 0) {
+        summary.innerHTML = '<p class="text-slate-400 text-sm text-center py-2">No items selected</p>';
+        totalEl.textContent = `${getCurrency()}0.00`;
+        submitBtn.disabled = true;
+        return;
+      }
+
+      let total = 0;
+      summary.innerHTML = orderItems.map(item => {
+        const subtotal = item.price * item.qty;
+        total += subtotal;
+        return `
+          <div class="flex justify-between text-sm">
+            <span class="text-slate-600">${item.qty}x ${item.name}</span>
+            <span class="font-medium text-slate-800">${getCurrency()}${subtotal.toFixed(2)}</span>
+          </div>
+        `;
+      }).join('');
+
+      totalEl.textContent = `${getCurrency()}${total.toFixed(2)}`;
+      submitBtn.disabled = !selectedTable || orderItems.length === 0;
+    }
+
+    function selectTable(num) {
+      selectedTable = num;
+      document.querySelectorAll('.table-btn').forEach(btn => {
+        if (parseInt(btn.textContent) === num) {
+          btn.classList.add('border-orange-500', 'text-orange-500', 'bg-orange-50');
+        } else {
+          btn.classList.remove('border-orange-500', 'text-orange-500', 'bg-orange-50');
+        }
+      });
+      renderOrderSummary();
+    }
+
+    async function submitOrder() {
+      if (isLoading || !selectedTable || orderItems.length === 0) return;
+
+      if (allData.filter(d => d.type === 'order').length >= 999) {
+        showToast('Maximum orders reached. Please delete old orders.');
+        return;
+      }
+
+      isLoading = true;
+      document.getElementById('submit-order-btn').textContent = 'Submitting...';
+
+      const total = orderItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+      const itemsStr = orderItems.map(i => `${i.qty}x ${i.name}`).join(', ');
+
+      const result = await window.dataSdk.create({
+        type: 'order',
+        table_number: selectedTable,
+        items: itemsStr,
+        total: total,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+
+      isLoading = false;
+      document.getElementById('submit-order-btn').textContent = 'Submit Order';
+
+      if (result.isOk) {
+        showToast('Order submitted successfully!');
+        orderItems = [];
+        selectedTable = null;
+        document.querySelectorAll('.table-btn').forEach(btn => {
+          btn.classList.remove('border-orange-500', 'text-orange-500', 'bg-orange-50');
+        });
+        renderOrderMenuItems();
+        switchTab('orders');
+      } else {
+        showToast('Failed to submit order');
+      }
+    }
+
+    // Menu form handling
+    document.getElementById('menu-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (isLoading) return;
+
+      if (allData.filter(d => d.type === 'menu_item').length >= 999) {
+        showToast('Maximum menu items reached.');
+        return;
+      }
+
+      const name = document.getElementById('item-name').value.trim();
+      const price = parseFloat(document.getElementById('item-price').value);
+      const category = document.getElementById('item-category').value;
+
+      if (!name || isNaN(price)) return;
+
+      isLoading = true;
+      document.getElementById('add-menu-btn').textContent = 'Adding...';
+
+      const result = await window.dataSdk.create({
+        type: 'menu_item',
+        name: name,
+        price: price,
+        category: category,
+        created_at: new Date().toISOString()
+      });
+
+      isLoading = false;
+      document.getElementById('add-menu-btn').textContent = 'Add to Menu';
+
+      if (result.isOk) {
+        showToast('Menu item added!');
+        document.getElementById('menu-form').reset();
+      } else {
+        showToast('Failed to add item');
+      }
+    });
+
+    // Delete modal handling
+    function openDeleteModal(type, id) {
+      deleteTarget = { type, id };
+      document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+      deleteTarget = null;
+      document.getElementById('delete-modal').classList.add('hidden');
+    }
+
+    async function confirmDelete() {
+      if (!deleteTarget || isLoading) return;
+
+      const item = allData.find(d => d.__backendId === deleteTarget.id);
+      if (!item) {
+        closeDeleteModal();
+        return;
+      }
+
+      isLoading = true;
+      document.getElementById('confirm-delete-btn').textContent = 'Deleting...';
+
+      const result = await window.dataSdk.delete(item);
+
+      isLoading = false;
+      document.getElementById('confirm-delete-btn').textContent = 'Delete';
+      closeDeleteModal();
+
+      if (result.isOk) {
+        showToast('Item deleted');
+      } else {
+        showToast('Failed to delete');
+      }
+    }
+
+    // Toast notification
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 2500);
+    }
+
+    // Initialize
+    initDataSdk();
+    applyConfig();
+  </script>
+</body>
+</html>
